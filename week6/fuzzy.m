@@ -1,100 +1,137 @@
-clc; clear all;
+clc; clear all; close all;
+
+global GA_VERI_GIRIS GA_VERI_CIKIS GA_SINIR
+
 %% Veri Okuma
 veri = readmatrix('veri_y.xlsx');
-% Sütunları görevlerine göre ayır
-input_data = veri(:, 1:2);
-output_gercek = veri(:, 3);
-% Veri sayısını otomatik belirle
-veri_sayisi = size(input_data, 1);
+GA_VERI_GIRIS = veri(:, 1:2);
+GA_VERI_CIKIS = veri(:, 3);
 
-%% Parametreler ve Popülasyon Başlangıcı
-n=20; m=7;
-sinir_alt1=52; sinir_ust1=77;
-sinir_alt2=3.72;  sinir_ust2=21.74;
-sinir_alt3=0.8;  sinir_ust3=3;
+%% Arama Uzayı ve GA Parametreleri
+GA_SINIR.input1 = [52, 77];
+GA_SINIR.input2 = [3.72, 21.74];
+GA_SINIR.cikis = [0.8, 3];
 
-% Popülasyon oluşturma
-for i=1:n
-    x(i,:) = sort(unifrnd(sinir_alt1, sinir_ust1, 1, m));
-    y(i,:) = sort(unifrnd(sinir_alt2, sinir_ust2, 1, m));
-    z(i,:) = sort(unifrnd(sinir_alt3, sinir_ust3, 1, m));
-end
+parametre.populasyon_boyutu = 30;
+parametre.nesil_sayisi = 60;
+parametre.caprazlama_olasiligi = 0.85;
+parametre.mutasyon_olasiligi = 0.12;
+parametre.elit_birey_sayisi = 2;
+parametre.turnuva_boyutu = 3;
+parametre.mutasyon_sigma = 0.75;
 
-% Oluşturulan FIS objelerini saklamak için hücre dizisi (Cell Array)
-fis_populasyonu = cell(n, 1);
-tahmin_sonuc = zeros(n, veri_sayisi);
-fitness = zeros(n, 1);
+%% Kural Önceleri (IF tarafı sabit), Çıkış sınıfı GA ile optimize edilir
+sabit_kural_onculleri = [ ...
+    1 1
+    1 3
+    2 2
+    3 2
+    3 3];
 
-%% Popülasyonu FIS'e yerleştirme döngüsü
-for i=1:n
-    % 1. FIS Objesini Oluştur
-    a = mamfis('Name', 'bulanik');
-    
-    % 2. INPUT 1 Ekle (addInput)
-    a = addInput(a, [sinir_alt1 sinir_ust1], 'Name', 'INPUT1');
-    a = addMF(a, 'INPUT1', 'trimf', [sinir_alt1, x(i,1), x(i,3)], 'Name', 'Düşük');
-    a = addMF(a, 'INPUT1', 'trimf', [x(i,2), x(i,4), x(i,6)], 'Name', 'Orta');
-    a = addMF(a, 'INPUT1', 'trimf', [x(i,5), x(i,7), sinir_ust1], 'Name', 'Yüksek');
-    
-    % 3. INPUT 2 Ekle (addInput)
-    a = addInput(a, [sinir_alt2 sinir_ust2], 'Name', 'INPUT2');
-    a = addMF(a, 'INPUT2', 'trimf', [sinir_alt2, y(i,1), y(i,3)], 'Name', 'Düşük');
-    a = addMF(a, 'INPUT2', 'trimf', [y(i,2), y(i,4), y(i,6)], 'Name', 'Orta');
-    a = addMF(a, 'INPUT2', 'trimf', [y(i,5), y(i,7), sinir_ust2], 'Name', 'Yüksek');
-    
-    % 4. CİKİS Ekle (addOutput)
-    a = addOutput(a, [sinir_alt3 sinir_ust3], 'Name', 'CİKİS');
-    a = addMF(a, 'CİKİS', 'trimf', [sinir_alt3, z(i,1), z(i,3)], 'Name', 'Düşük');
-    a = addMF(a, 'CİKİS', 'trimf', [z(i,2), z(i,4), z(i,6)], 'Name', 'Orta');
-    a = addMF(a, 'CİKİS', 'trimf', [z(i,5), z(i,7), sinir_ust3], 'Name', 'Yüksek');
-    
-    % 5. Kuralları Ekle (addRule)
-    ruleList=[ ...
-    1 1 1 1 1
-    1 3 3 1 1
-    2 2 1 1 1
-    3 2 3 1 1
-    3 3 2 1 1];
-    a = addRule(a, ruleList);
-    
-    % FIS objesini hafızaya kaydet
-    fis_populasyonu{i} = a;
-    
-    % 6. Tahmin Hesaplama
-    for k = 1:veri_sayisi 
-        tahmin_sonuc(i, k) = evalfis(a, input_data(k, :));
+kural_sayisi = size(sabit_kural_onculleri, 1);
+kural_gen_baslangic = 22;
+
+%% Başlangıç Popülasyonu
+populasyon = ga_populasyon_baslat(parametre.populasyon_boyutu, kural_sayisi);
+
+en_iyi_hata = inf;
+en_iyi_fis = [];
+en_iyi_kromozom = [];
+en_iyi_kural_listesi = [];
+en_iyi_tahmin = [];
+
+%% Genetik Algoritma Döngüsü
+for nesil = 1:parametre.nesil_sayisi
+    uygunluk = zeros(parametre.populasyon_boyutu, 1);
+    fis_pop = cell(parametre.populasyon_boyutu, 1);
+    kural_pop = cell(parametre.populasyon_boyutu, 1);
+    tahmin_pop = cell(parametre.populasyon_boyutu, 1);
+
+    for i = 1:parametre.populasyon_boyutu
+        [uygunluk(i), fis_pop{i}, kural_pop{i}, tahmin_pop{i}] = ga_uygunluk_hesapla(populasyon(i, :), sabit_kural_onculleri);
     end
-    
-    % 7. Bireyin hatasını hesapla (MSE)
-    hata_vektoru = abs(output_gercek' - tahmin_sonuc(i, :));
-    fitness(i) = sum(hata_vektoru); % Bu değer ne kadar küçükse birey o kadar iyi
+
+    [nesil_en_iyi_hata, nesil_en_iyi_indis] = min(uygunluk);
+    if nesil_en_iyi_hata < en_iyi_hata
+        en_iyi_hata = nesil_en_iyi_hata;
+        en_iyi_fis = fis_pop{nesil_en_iyi_indis};
+        en_iyi_kromozom = populasyon(nesil_en_iyi_indis, :);
+        en_iyi_kural_listesi = kural_pop{nesil_en_iyi_indis};
+        en_iyi_tahmin = tahmin_pop{nesil_en_iyi_indis};
+    end
+
+    fprintf('Nesil %d/%d -> En iyi MAE: %.6f\n', nesil, parametre.nesil_sayisi, en_iyi_hata);
+
+    yeni_populasyon = zeros(size(populasyon));
+    [~, sirali_indis] = sort(uygunluk, 'ascend');
+
+    for e = 1:parametre.elit_birey_sayisi
+        yeni_populasyon(e, :) = populasyon(sirali_indis(e), :);
+    end
+
+    yazma_indisi = parametre.elit_birey_sayisi + 1;
+    while yazma_indisi <= parametre.populasyon_boyutu
+        ebeveyn1 = populasyon(ga_secim_turnuva(uygunluk, parametre.turnuva_boyutu), :);
+        ebeveyn2 = populasyon(ga_secim_turnuva(uygunluk, parametre.turnuva_boyutu), :);
+
+        [cocuk1, cocuk2] = ga_caprazlama(ebeveyn1, ebeveyn2, parametre.caprazlama_olasiligi, kural_gen_baslangic);
+
+        cocuk1 = ga_mutasyon(cocuk1, parametre.mutasyon_olasiligi, parametre.mutasyon_sigma, kural_gen_baslangic);
+        cocuk2 = ga_mutasyon(cocuk2, parametre.mutasyon_olasiligi, parametre.mutasyon_sigma, kural_gen_baslangic);
+
+        cocuk1 = ga_kromozom_duzelt(cocuk1, kural_gen_baslangic);
+        cocuk2 = ga_kromozom_duzelt(cocuk2, kural_gen_baslangic);
+
+        yeni_populasyon(yazma_indisi, :) = cocuk1;
+        if yazma_indisi + 1 <= parametre.populasyon_boyutu
+            yeni_populasyon(yazma_indisi + 1, :) = cocuk2;
+        end
+        yazma_indisi = yazma_indisi + 2;
+    end
+
+    populasyon = yeni_populasyon;
 end
 
-%% En İyi Bireyi Bulma ve Görselleştirme
-[en_iyi_hata, en_iyi_indis] = min(fitness);
-fprintf('En başarılı birey: %d. birey\n', en_iyi_indis);
-fprintf('Minimum Hata (MSE): %.4f\n', en_iyi_hata);
+%% Sonuçları Yazdırma
+[~, ~, siniflar] = ga_fis_olustur(en_iyi_kromozom, sabit_kural_onculleri);
 
-% En iyi FIS objesini çek
-en_iyi_fis = fis_populasyonu{en_iyi_indis};
+fprintf('\n=== GENETIK ALGORITMA SONUCU ===\n');
+fprintf('En iyi MAE: %.6f\n', en_iyi_hata);
+fprintf('Optimize edilmiş kural listesi [INPUT1 INPUT2 CIKIS AGIRLIK VE]:\n');
+disp(en_iyi_kural_listesi);
 
-% Grafikleri Çizdir (subplot ile 3 grafiği alt alta gösterelim)
-figure('Name', 'En İyi Bireyin Üyelik Fonksiyonları', 'Position', [100, 100, 800, 600]);
+fprintf('INPUT1 - Dusuk MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.input1(1, :));
+fprintf('INPUT1 - Orta  MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.input1(2, :));
+fprintf('INPUT1 - Yuksek MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.input1(3, :));
 
-subplot(3, 1, 1);
+fprintf('INPUT2 - Dusuk MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.input2(1, :));
+fprintf('INPUT2 - Orta  MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.input2(2, :));
+fprintf('INPUT2 - Yuksek MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.input2(3, :));
+
+fprintf('CIKIS  - Dusuk MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.cikis(1, :));
+fprintf('CIKIS  - Orta  MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.cikis(2, :));
+fprintf('CIKIS  - Yuksek MF [a b c]: [%.4f %.4f %.4f]\n', siniflar.cikis(3, :));
+
+%% Görselleştirme
+figure('Name', 'GA ile Optimize Edilmiş FIS', 'Position', [100, 100, 850, 650]);
+
+subplot(4, 1, 1);
 plotmf(en_iyi_fis, 'input', 1);
-title(sprintf('INPUT 1 (En İyi %d. Birey)', en_iyi_indis));
+title('INPUT1 - Dusuk / Orta / Yuksek');
 
-subplot(3, 1, 2);
+subplot(4, 1, 2);
 plotmf(en_iyi_fis, 'input', 2);
-title(sprintf('INPUT 2 (En İyi %d. Birey)', en_iyi_indis));
+title('INPUT2 - Dusuk / Orta / Yuksek');
 
-subplot(3, 1, 3);
+subplot(4, 1, 3);
 plotmf(en_iyi_fis, 'output', 1);
-title(sprintf('ÇIKIŞ (En İyi %d. Birey)', en_iyi_indis));
+title('CIKIS - Dusuk / Orta / Yuksek');
 
-%% Seleksiyon
-
-%% Çaprazlama
-
-%% Mutasyon
+subplot(4, 1, 4);
+plot(GA_VERI_CIKIS, 'b', 'LineWidth', 1.1); hold on;
+plot(en_iyi_tahmin, 'r--', 'LineWidth', 1.1);
+grid on;
+legend('Gercek', 'Tahmin', 'Location', 'best');
+title('Gercek ve Tahmin Cikis Degerleri');
+xlabel('Ornek No');
+ylabel('Cikis');

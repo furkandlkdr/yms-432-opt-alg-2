@@ -1,0 +1,1 @@
+Bu hafta verilen kodlar örnek olarak gösterilip, önceki örneğin devam ettirilmesi istenmiştir.
