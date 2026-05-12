@@ -12,13 +12,15 @@ GA_SINIR.input1 = [52, 77];
 GA_SINIR.input2 = [3.72, 21.74];
 GA_SINIR.cikis = [0.8, 3];
 
-parametre.populasyon_boyutu = 30;
-parametre.nesil_sayisi = 60;
+parametre.populasyon_boyutu = 20;
+parametre.nesil_sayisi = 25;
 parametre.caprazlama_olasiligi = 0.85;
 parametre.mutasyon_olasiligi = 0.12;
 parametre.elit_birey_sayisi = 2;
 parametre.turnuva_boyutu = 3;
 parametre.mutasyon_sigma = 0.75;
+parametre.iyilesme_tol = 1e-5;
+parametre.erken_durdurma_sabir = 8;
 
 %% Kural Önceleri (IF tarafı sabit), Çıkış sınıfı GA ile optimize edilir
 sabit_kural_onculleri = [ ...
@@ -39,9 +41,11 @@ en_iyi_fis = [];
 en_iyi_kromozom = [];
 en_iyi_kural_listesi = [];
 en_iyi_tahmin = [];
+durgun_nesil_sayisi = 0;
 
 %% Genetik Algoritma Döngüsü
 for nesil = 1:parametre.nesil_sayisi
+    nesil_tic = tic;
     uygunluk = zeros(parametre.populasyon_boyutu, 1);
     fis_pop = cell(parametre.populasyon_boyutu, 1);
     kural_pop = cell(parametre.populasyon_boyutu, 1);
@@ -52,6 +56,7 @@ for nesil = 1:parametre.nesil_sayisi
     end
 
     [nesil_en_iyi_hata, nesil_en_iyi_indis] = min(uygunluk);
+    onceki_en_iyi_hata = en_iyi_hata;
     if nesil_en_iyi_hata < en_iyi_hata
         en_iyi_hata = nesil_en_iyi_hata;
         en_iyi_fis = fis_pop{nesil_en_iyi_indis};
@@ -60,7 +65,15 @@ for nesil = 1:parametre.nesil_sayisi
         en_iyi_tahmin = tahmin_pop{nesil_en_iyi_indis};
     end
 
-    fprintf('Nesil %d/%d -> En iyi MAE: %.6f\n', nesil, parametre.nesil_sayisi, en_iyi_hata);
+    iyilesme_miktari = onceki_en_iyi_hata - en_iyi_hata;
+    if iyilesme_miktari > parametre.iyilesme_tol
+        durgun_nesil_sayisi = 0;
+    else
+        durgun_nesil_sayisi = durgun_nesil_sayisi + 1;
+    end
+
+    fprintf('Nesil %d/%d -> En iyi MAE: %.6f | Sure: %.2f sn | Durgun: %d\n', ...
+        nesil, parametre.nesil_sayisi, en_iyi_hata, toc(nesil_tic), durgun_nesil_sayisi);
 
     yeni_populasyon = zeros(size(populasyon));
     [~, sirali_indis] = sort(uygunluk, 'ascend');
@@ -90,6 +103,11 @@ for nesil = 1:parametre.nesil_sayisi
     end
 
     populasyon = yeni_populasyon;
+
+    if durgun_nesil_sayisi >= parametre.erken_durdurma_sabir
+        fprintf('Erken durdurma: %d nesildir anlamli iyilesme yok.\n', parametre.erken_durdurma_sabir);
+        break;
+    end
 end
 
 %% Sonuçları Yazdırma
