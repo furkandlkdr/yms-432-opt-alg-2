@@ -43,8 +43,8 @@ function f1_ortalama = caprazvalidasyon_f1(X, y, model_tipi, hiperparametre)
         try
             if strcmpi(model_tipi, 'svm')
                 y_pred = tahmin_svm(X_train, y_train, X_test, hiperparametre);
-            elseif strcmpi(model_tipi, 'rf')
-                y_pred = tahmin_randomforest(X_train, y_train, X_test, hiperparametre);
+            elseif strcmpi(model_tipi, 'ensemble')
+                y_pred = tahmin_ensemble(X_train, y_train, X_test, hiperparametre);
             elseif strcmpi(model_tipi, 'mlp')
                 y_pred = tahmin_mlp(X_train, y_train, X_test, hiperparametre);
             end
@@ -115,23 +115,21 @@ function y_pred = tahmin_svm(X_train, y_train, X_test, hiperparametre)
     end
 end
 
-function y_pred = tahmin_randomforest(X_train, y_train, X_test, hiperparametre)
-    % Random Forest modeli eğit ve tahmin yap
+function y_pred = tahmin_ensemble(X_train, y_train, X_test, hiperparametre)
+    % Ensemble modeli (fitcensemble) eğit ve tahmin yap
     try
-        % TreeBagger binary classification için kullanılır
+        n_ozellik = size(X_train, 2);
+        subspace_dimension = max(1, min(15, n_ozellik - 1));
+        
         y_train = double(y_train);
-        mdl = TreeBagger(hiperparametre.NumTrees, X_train, y_train, ...
-            'MinLeafSize', hiperparametre.MinLeafSize, ...
-            'OOBPredictorImportance', 'on');
+        mdl = fitcensemble(X_train, y_train, ...
+            'Method', 'Subspace', ...
+            'NumLearningCycles', max(10, round(hiperparametre.NumLearningCycles)), ...
+            'Learners', 'knn', ...
+            'NPredToSample', max(1, min(subspace_dimension, round(hiperparametre.NPredToSample))));
         
         % Tahmin yap
-        [y_pred, ~] = predict(mdl, X_test);
-        
-        % String çıktısını sayıya çevir
-        if iscellstr(y_pred) || isstring(y_pred)
-            % String ise sayıya çevir
-            y_pred = cellfun(@(x) str2double(x), y_pred);
-        end
+        y_pred = predict(mdl, X_test);
         y_pred = double(y_pred);
     catch
         y_pred = zeros(size(X_test, 1), 1);

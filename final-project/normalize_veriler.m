@@ -15,5 +15,12 @@ function X_normalized = normalize_veriler(X)
     % Z-score normalizasyonu: (X - mean) / std
     X_normalized = (X - X_mean) ./ X_std;
     
-    fprintf('Veriler normalizasyon işleminden geçti.\n');
+    fprintf('\n========== GİRİŞ ÖZELLİKLERİ NORMALİZASYONU ==========\n\n');
+    fprintf('X - NORMALİZE EDİLMİŞ GİRİŞ ÖZELLİKLERİ (NORMALIZED INPUT FEATURES):\n');
+    fprintf('  Boyut (Size): %d x %d\n', size(X_normalized, 1), size(X_normalized, 2));
+    fprintf('  Yöntem (Method): Z-score normalization\n');
+    fprintf('  Min Değer: %.6f\n', min(X_normalized(:)));
+    fprintf('  Max Değer: %.6f\n', max(X_normalized(:)));
+    fprintf('  Ortalama (Mean): %.6f\n', mean(X_normalized(:)));
+    fprintf('=====================================================\n\n');
 end

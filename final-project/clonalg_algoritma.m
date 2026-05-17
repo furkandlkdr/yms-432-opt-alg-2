@@ -137,11 +137,11 @@ function populasyon = olustur_populasyon(n, model_tipi)
             populasyon(i).KernelScale = exp(log_gamma);
         end
         
-    elseif strcmpi(model_tipi, 'rf')
-        % RF parametrelerini rastgele oluştur
+    elseif strcmpi(model_tipi, 'ensemble')
+        % Ensemble parametrelerini rastgele oluştur
         for i = 1:n
-            populasyon(i).NumTrees = round(10 + (200 - 10) * rand());
-            populasyon(i).MinLeafSize = round(1 + (20 - 1) * rand());
+            populasyon(i).NumLearningCycles = round(10 + (200 - 10) * rand());
+            populasyon(i).NPredToSample = round(1 + (15 - 1) * rand());
         end
         
     elseif strcmpi(model_tipi, 'mlp')
@@ -163,7 +163,7 @@ function afinite = hesapla_afinite(antikor, X_train, y_train, model_tipi)
     % Antikorun afinitesini hesapla
     if strcmpi(model_tipi, 'svm')
         afinite = svm_afinite(antikor, X_train, y_train);
-    elseif strcmpi(model_tipi, 'rf')
+    elseif strcmpi(model_tipi, 'ensemble')
         afinite = randomforest_afinite(antikor, X_train, y_train);
     elseif strcmpi(model_tipi, 'mlp')
         afinite = mlp_afinite(antikor, X_train, y_train);

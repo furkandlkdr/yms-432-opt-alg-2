@@ -4,7 +4,7 @@ function antikor_mutant = mutasyon_operatoru(antikor, afinite, model_tipi, rho)
     % Giriş:
     %   antikor: Mutasyona tabi tutulacak antikor (hiperparametre seti)
     %   afinite: Antikorun afinite değeri
-    %   model_tipi: 'svm', 'rf', 'mlp'
+    %   model_tipi: 'svm', 'ensemble', 'mlp'
     %   rho: Mutasyon sabiti (varsayılan 0.1)
     % Çıkış:
     %   antikor_mutant: Mutasyona uğramış antikor
@@ -47,20 +47,20 @@ function antikor_mutant = mutasyon_operatoru(antikor, afinite, model_tipi, rho)
             antikor_mutant.KernelScale = max(0.001, min(10, antikor_mutant.KernelScale));
         end
         
-    elseif strcmpi(model_tipi, 'rf')
-        % Random Forest hiperparametreleri
-        % 1: NumTrees (tam sayı)
+    elseif strcmpi(model_tipi, 'ensemble')
+        % Ensemble hiperparametreleri
+        % 1: NumLearningCycles (tam sayı)
         if rand() < mutation_rate
             delta = round(randn() * mutation_rate * 50);
-            antikor_mutant.NumTrees = antikor_mutant.NumTrees + delta;
-            antikor_mutant.NumTrees = max(10, min(200, antikor_mutant.NumTrees));
+            antikor_mutant.NumLearningCycles = antikor_mutant.NumLearningCycles + delta;
+            antikor_mutant.NumLearningCycles = max(10, min(200, antikor_mutant.NumLearningCycles));
         end
         
-        % 2: MinLeafSize (tam sayı)
+        % 2: NPredToSample (tam sayı)
         if rand() < mutation_rate
-            delta = round(randn() * mutation_rate * 5);
-            antikor_mutant.MinLeafSize = antikor_mutant.MinLeafSize + delta;
-            antikor_mutant.MinLeafSize = max(1, min(20, antikor_mutant.MinLeafSize));
+            delta = round(randn() * mutation_rate * 3);
+            antikor_mutant.NPredToSample = antikor_mutant.NPredToSample + delta;
+            antikor_mutant.NPredToSample = max(1, min(15, antikor_mutant.NPredToSample));
         end
         
     elseif strcmpi(model_tipi, 'mlp')

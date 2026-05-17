@@ -6,7 +6,7 @@
 % 
 % Modeller:
 %   1. Destek Vektör Makineleri (SVM)
-%   2. Rastgele Orman (Random Forest)
+%   2. Ensemble (Subspace KNN)
 %   3. Çok Katmanlı Algılayıcı (MLP)
 %
 % Veri Seti: Breast Cancer Wisconsin
@@ -42,8 +42,16 @@ y_train = y(train_idx, :);
 X_test = X_normalized(test_idx, :);
 y_test = y(test_idx, :);
 
-fprintf('Eğitim Seti: %d örnek\n', size(X_train, 1));
-fprintf('Test Seti: %d örnek\n\n', size(X_test, 1));
+fprintf('\n========== AYRILMIŞ VERİ SETLERİ (SEPARATED DATASETS) ==========\n\n');
+fprintf('X_train - EĞİTİM GİRİŞ ÖZELLİKLERİ (TRAINING INPUT FEATURES):\n');
+fprintf('  Boyut (Size): %d x %d\n\n', size(X_train, 1), size(X_train, 2));
+fprintf('y_train - EĞİTİM ÇIKTI ETİKETLERİ (TRAINING OUTPUT LABELS):\n');
+fprintf('  Boyut (Size): %d x 1\n\n', size(y_train, 1));
+fprintf('X_test - TEST GİRİŞ ÖZELLİKLERİ (TEST INPUT FEATURES):\n');
+fprintf('  Boyut (Size): %d x %d\n\n', size(X_test, 1), size(X_test, 2));
+fprintf('y_test - TEST ÇIKTI ETİKETLERİ (TEST OUTPUT LABELS):\n');
+fprintf('  Boyut (Size): %d x 1\n', size(y_test, 1));
+fprintf('=============================================================\n\n');
 
 % ==================== ADİM 2: CLONALG PARAMETRELERI ====================
 % CLONALG için genel parametreler
@@ -78,15 +86,15 @@ sonuclar.svm.sure = surej_svm;
 fprintf('SVM Optimizasyonu Tamamlandı - Süre: %.2f saniye\n', surej_svm);
 fprintf('En İyi Afinite: %.4f\n\n', svm_en_iyi_afinite);
 
-% ==================== ADİM 4: RANDOM FOREST OPTIMIZASYONU ====================
-fprintf('--- Random Forest Hiperparametre Optimizasyonu Başlatıldı ---\n');
+% ==================== ADİM 4: ENSEMBLE OPTIMIZASYONU ====================
+fprintf('--- Ensemble Hiperparametre Optimizasyonu Başlatıldı ---\n');
 fprintf('Parametreler:\n');
-fprintf('  NumTrees: [10, 200]\n');
-fprintf('  MinLeafSize: [1, 20]\n\n');
+fprintf('  NumLearningCycles: [10, 200]\n');
+fprintf('  NPredToSample: [1, 15]\n\n');
 
 surej_rf_baslangic = tic;
 [rf_en_iyi, rf_en_iyi_afinite, rf_afinite_gecmisi] = clonalg_algoritma(...
-    X_train, y_train, 'rf', pop_buyut, n_secilecek, beta, rho, d, max_iterasyon);
+    X_train, y_train, 'ensemble', pop_buyut, n_secilecek, beta, rho, d, max_iterasyon);
 surej_rf = toc(surej_rf_baslangic);
 
 sonuclar.rf.en_iyi_hiperparametre = rf_en_iyi;
@@ -94,7 +102,7 @@ sonuclar.rf.en_iyi_afinite = rf_en_iyi_afinite;
 sonuclar.rf.afinite_gecmisi = rf_afinite_gecmisi;
 sonuclar.rf.sure = surej_rf;
 
-fprintf('Random Forest Optimizasyonu Tamamlandı - Süre: %.2f saniye\n', surej_rf);
+fprintf('Ensemble Optimizasyonu Tamamlandı - Süre: %.2f saniye\n', surej_rf);
 fprintf('En İyi Afinite: %.4f\n\n', rf_en_iyi_afinite);
 
 % ==================== ADİM 5: MLP OPTIMIZASYONU ====================
@@ -130,8 +138,8 @@ fprintf('---            | ---              | ---       | ---\n');
 fprintf('SVM            | %.4f            | %.2f     | \n', svm_en_iyi_afinite, surej_svm);
 fprintf('               | C=%.4f, K=%s, G=%.4f\n', ...
     svm_en_iyi.BoxConstraint, svm_en_iyi.KernelFunction, svm_en_iyi.KernelScale);
-fprintf('Random Forest  | %.4f            | %.2f     | \n', rf_en_iyi_afinite, surej_rf);
-fprintf('               | Trees=%d, MinLeaf=%d\n', rf_en_iyi.NumTrees, rf_en_iyi.MinLeafSize);
+fprintf('Ensemble       | %.4f            | %.2f     | \n', rf_en_iyi_afinite, surej_rf);
+fprintf('               | Cycles=%d, NPred=%d\n', rf_en_iyi.NumLearningCycles, rf_en_iyi.NPredToSample);
 fprintf('MLP            | %.4f            | %.2f     | \n', mlp_en_iyi_afinite, surej_mlp);
 fprintf('               | LS=%d, A=%s, LR=%.6f\n', ...
     mlp_en_iyi.LayerSizes, mlp_en_iyi.Activation, mlp_en_iyi.InitialLearnRate);
@@ -149,13 +157,13 @@ ylabel('Afinite (F1-Score)');
 title(sprintf('SVM Yakınsama\nEn İyi: %.4f', svm_en_iyi_afinite));
 ylim([0 1]);
 
-% Random Forest Yakınsama
+% Ensemble Yakınsama
 subplot(2, 3, 2);
 plot(rf_afinite_gecmisi, 'g-', 'LineWidth', 2);
 grid on;
 xlabel('İterasyon');
 ylabel('Afinite (F1-Score)');
-title(sprintf('Random Forest Yakınsama\nEn İyi: %.4f', rf_en_iyi_afinite));
+title(sprintf('Ensemble Yakınsama\nEn İyi: %.4f', rf_en_iyi_afinite));
 ylim([0 1]);
 
 % MLP Yakınsama
@@ -171,7 +179,7 @@ ylim([0 1]);
 subplot(2, 3, 4);
 en_iyi_afniteler = [svm_en_iyi_afinite, rf_en_iyi_afinite, mlp_en_iyi_afinite];
 bar(en_iyi_afniteler, 'FaceColor', [0.2 0.4 0.8], 'EdgeColor', 'black');
-set(gca, 'XTickLabel', {'SVM', 'RF', 'MLP'});
+set(gca, 'XTickLabel', {'SVM', 'Ensemble', 'MLP'});
 ylabel('Afinite (F1-Score)');
 title('Model Performans Karşılaştırması');
 ylim([0 1]);
@@ -181,7 +189,7 @@ grid on;
 subplot(2, 3, 5);
 sureler = [surej_svm, surej_rf, surej_mlp];
 bar(sureler, 'FaceColor', [0.8 0.4 0.2], 'EdgeColor', 'black');
-set(gca, 'XTickLabel', {'SVM', 'RF', 'MLP'});
+set(gca, 'XTickLabel', {'SVM', 'Ensemble', 'MLP'});
 ylabel('Süre (saniye)');
 title('Optimizasyon Süresi Karşılaştırması');
 grid on;
@@ -204,7 +212,7 @@ info_text = sprintf([...
     'Değerlendirme: 5-Fold CV\n'...
     'Metrik: Makro F1-Score\n'], ...
     size(X_train, 1), size(X_test, 1), pop_buyut, n_secilecek, max_iterasyon, beta, rho);
-text(0.05, 0.95, info_text, 'VerticalAlignment', 'top', 'FontFamily', 'monospace', ...
+text(0.05, 0.95, info_text, 'VerticalAlignment', 'top', ...
     'FontSize', 10, 'FontWeight', 'bold');
 
 sgtitle('CLONALG Hiperparametre Optimizasyonu Sonuçları', 'FontSize', 14, 'FontWeight', 'bold');
@@ -218,18 +226,18 @@ fprintf('\n--- OPTİMİZASYON TERCİH ÖNERISI ---\n');
 
 % En iyi modeli belirle
 [~, en_iyi_model_idx] = max([svm_en_iyi_afinite, rf_en_iyi_afinite, mlp_en_iyi_afinite]);
-model_isimleri = {'SVM', 'Random Forest', 'MLP'};
+model_isimleri = {'SVM', 'Ensemble', 'MLP'};
 fprintf('En başarılı model: %s (F1 = %.4f)\n\n', model_isimleri{en_iyi_model_idx}, ...
     max([svm_en_iyi_afinite, rf_en_iyi_afinite, mlp_en_iyi_afinite]));
 
 fprintf('Sistem Önerileri:\n');
-fprintf('  1. Hiperparametre otimizasyonu başarıyla tamamlandı.\n');
-fprintf('  2. Bulunun en iyi parametreler test seti üzerinde değerlendirilmelidir.\n');
+fprintf('  1. Hiperparametre optimizasyonu başarıyla tamamlandı.\n');
+fprintf('  2. Bulunan en iyi parametreler test seti üzerinde değerlendirilmelidir.\n');
 fprintf('  3. Çeşitlilik sağlanması için tüm modeller birlikte ensemble kullanılabilir.\n');
-fprintf('  4. Daha fazla iterasyon veya daha geniş parametre alanı denenenebilir.\n\n');
+fprintf('  4. Daha fazla iterasyon veya daha geniş parametre alanı denenebilir.\n\n');
 
 fprintf('╔══════════════════════════════════════════════════════════╗\n');
-fprintf('║                 PROGRAM BAŞARI İLE TERMAMSıNDI           ║\n');
+fprintf('║                 PROGRAM BAŞARI İLE TAMAMLANDI            ║\n');
 fprintf('╚══════════════════════════════════════════════════════════╝\n\n');
 
 % ==================== DEBUG/SAVE ====================
